@@ -35,7 +35,7 @@
 					</executions>
 					<archive>
 						<manifest>
-							<mainClass>com.chimpler.example.bayes.TSVToSequenceReader</mainClass>
+							<mainClass>com.chimpler.example.bayes.TweetTSVToSeq</mainClass>
 							<addClasspath>true</addClasspath>
 						</manifest>
 					</archive>
