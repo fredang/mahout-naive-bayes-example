@@ -100,9 +100,10 @@ public class Classifier {
 			}
 			
 			String[] tokens = line.split("\t", 2);
+			String tweetId = tokens[0];
 			String tweet = tokens[1];
 
-			System.out.println("Tweet: " + tweet);
+			System.out.println("Tweet: " + tweetId + "\t" + tweet);
 
 			Multiset<String> words = ConcurrentHashMultiset.create();
 			
