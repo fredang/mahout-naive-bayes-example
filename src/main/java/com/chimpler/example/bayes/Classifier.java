@@ -77,12 +77,12 @@ public class Classifier {
 
 		// model is a matrix (wordId, labelId) => probability score
 		NaiveBayesModel model = NaiveBayesModel.materialize(new Path(modelPath), configuration);
+		StandardNaiveBayesClassifier classifier = new StandardNaiveBayesClassifier(model);
 
 		// labels is a map label => classId
 		Map<Integer, String> labels = BayesUtils.readLabelIndex(configuration, new Path(labelIndexPath));
 		Map<String, Integer> dictionary = readDictionnary(configuration, new Path(dictionaryPath));
 		Map<Integer, Long> documentFrequency = readDocumentFrequency(configuration, new Path(documentFrequencyPath));
-		StandardNaiveBayesClassifier classifier = new StandardNaiveBayesClassifier(model);
 
 		// analyzer used to extract word from tweet
 		Analyzer analyzer = new DefaultAnalyzer();
@@ -91,7 +91,7 @@ public class Classifier {
 		int documentCount = documentFrequency.get(-1).intValue();
 		
 		System.out.println("Number of labels: " + labelCount);
-		System.out.println("Number of documents: " + documentCount);
+		System.out.println("Number of documents in training set: " + documentCount);
 		BufferedReader reader = new BufferedReader(new FileReader(tweetsPath));
 		while(true) {
 			String line = reader.readLine();
@@ -111,7 +111,6 @@ public class Classifier {
 			TokenStream ts = analyzer.reusableTokenStream("text", new StringReader(tweet));
 			CharTermAttribute termAtt = ts.addAttribute(CharTermAttribute.class);
 			ts.reset();
-
 			while (ts.incrementToken()) {
 				if (termAtt.length() > 0) {
 					String s = ts.getAttribute(CharTermAttribute.class).toString();
@@ -119,15 +118,16 @@ public class Classifier {
 				}
 			}
 
-			// create vector wordId => weight
+			// create vector wordId => weight using tfidf
 			Vector vector = new RandomAccessSparseVector(10000);
 			TFIDF tfidf = new TFIDF();
 			for (Multiset.Entry<String> entry:words.entrySet()) {
 				String word = entry.getElement();
 				int count = entry.getCount();
 				Integer wordId = dictionary.get(word);
-				Long freq = documentFrequency.get(wordId);
+				// if the word is not in the dictionary, skip it
 				if (wordId != null) {
+					Long freq = documentFrequency.get(wordId);
 					vector.setQuick(wordId, tfidf.calculate(count, freq.intValue(), labelCount, documentCount));
 				}
 			}
