@@ -44,6 +44,9 @@ import org.apache.mahout.vectorizer.TFIDF;
 import com.google.common.collect.ConcurrentHashMultiset;
 import com.google.common.collect.Multiset;
 
+/**
+ * http://www.chimpler.com
+ */
 public class Classifier {
 	
 	public static Map<String, Integer> readDictionnary(Configuration conf, Path dictionnaryPath) {
@@ -77,6 +80,7 @@ public class Classifier {
 
 		// model is a matrix (wordId, labelId) => probability score
 		NaiveBayesModel model = NaiveBayesModel.materialize(new Path(modelPath), configuration);
+		
 		StandardNaiveBayesClassifier classifier = new StandardNaiveBayesClassifier(model);
 
 		// labels is a map label => classId
@@ -84,6 +88,7 @@ public class Classifier {
 		Map<String, Integer> dictionary = readDictionnary(configuration, new Path(dictionaryPath));
 		Map<Integer, Long> documentFrequency = readDocumentFrequency(configuration, new Path(documentFrequencyPath));
 
+		
 		// analyzer used to extract word from tweet
 		Analyzer analyzer = new DefaultAnalyzer();
 		

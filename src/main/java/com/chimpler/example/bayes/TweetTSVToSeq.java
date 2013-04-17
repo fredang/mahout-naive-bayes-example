@@ -26,6 +26,9 @@ import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.Writer;
 import org.apache.hadoop.io.Text;
 
+/**
+ * http://www.chimpler.com
+ */
 public class TweetTSVToSeq {
 	public static void main(String args[]) throws Exception {
 		if (args.length != 2) {
@@ -34,7 +37,6 @@ public class TweetTSVToSeq {
 		}
 		String inputFileName = args[0];
 		String outputDirName = args[1];
-		
 		Configuration configuration = new Configuration();
 		FileSystem fs = FileSystem.get(configuration);
 		Writer writer = new SequenceFile.Writer(fs, configuration, new Path(outputDirName + "/chunk-0"),
