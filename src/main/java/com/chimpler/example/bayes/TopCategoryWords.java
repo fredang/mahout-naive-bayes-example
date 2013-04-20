@@ -16,10 +16,17 @@
 
 package com.chimpler.example.bayes;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.Map.Entry;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -28,7 +35,6 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.mahout.classifier.naivebayes.BayesUtils;
 import org.apache.mahout.classifier.naivebayes.NaiveBayesModel;
-import org.apache.mahout.classifier.naivebayes.StandardNaiveBayesClassifier;
 import org.apache.mahout.common.Pair;
 import org.apache.mahout.common.iterator.sequencefile.SequenceFileIterable;
 
@@ -44,13 +50,35 @@ public class TopCategoryWords {
 		}
 		return inverseDictionnary;
 	}
-
+	
 	public static Map<Integer, Long> readDocumentFrequency(Configuration conf, Path documentFrequencyPath) {
 		Map<Integer, Long> documentFrequency = new HashMap<Integer, Long>();
 		for (Pair<IntWritable, LongWritable> pair : new SequenceFileIterable<IntWritable, LongWritable>(documentFrequencyPath, true, conf)) {
 			documentFrequency.put(pair.getFirst().get(), pair.getSecond().get());
 		}
 		return documentFrequency;
+	}
+
+	public static Map<Integer, Long> getTopWords(Map<Integer, Long> documentFrequency, int topWordsCount) {
+		List<Map.Entry<Integer, Long>> entries = new ArrayList<Map.Entry<Integer, Long>>(documentFrequency.entrySet());
+		Collections.sort(entries, new Comparator<Map.Entry<Integer, Long>>() {
+			@Override
+			public int compare(Entry<Integer, Long> e1, Entry<Integer, Long> e2) {
+				return -e1.getValue().compareTo(e2.getValue());
+			}
+		});
+		
+		Map<Integer, Long> topWords = new HashMap<Integer, Long>();
+		int i = 0;
+		for(Map.Entry<Integer, Long> entry: entries) {
+			topWords.put(entry.getKey(), entry.getValue());
+			i++;
+			if (i > topWordsCount) {
+				break;
+			}
+		}
+		
+		return topWords;
 	}
 	
 	public static class WordWeight implements Comparable<WordWeight> {
@@ -91,13 +119,17 @@ public class TopCategoryWords {
 		// model is a matrix (wordId, labelId) => probability score
 		NaiveBayesModel model = NaiveBayesModel.materialize(new Path(modelPath), configuration);
 		
-		StandardNaiveBayesClassifier classifier = new StandardNaiveBayesClassifier(model);
-
 		// labels is a map label => classId
 		Map<Integer, String> labels = BayesUtils.readLabelIndex(configuration, new Path(labelIndexPath));
 		Map<Integer, String> inverseDictionary = readInverseDictionnary(configuration, new Path(dictionaryPath));
 		Map<Integer, Long> documentFrequency = readDocumentFrequency(configuration, new Path(documentFrequencyPath));
 
+		Map<Integer, Long> topWords = getTopWords(documentFrequency, 10);
+		System.out.println("Top words");
+		for(Map.Entry<Integer, Long> entry: topWords.entrySet()) {
+			System.out.println(" - " + inverseDictionary.get(entry.getKey())
+					+ ": " + entry.getValue());
+		}
 		
 		int labelCount = labels.size();
 		int documentCount = documentFrequency.get(-1).intValue();
