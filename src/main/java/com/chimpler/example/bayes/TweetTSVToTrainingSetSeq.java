@@ -1,19 +1,3 @@
-/*
- * Copyright (c) 2010 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package com.chimpler.example.bayes;
 
 import java.io.BufferedReader;
@@ -23,32 +7,28 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.io.SequenceFile.Writer;
 import org.apache.hadoop.io.Text;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-import org.apache.mahout.classifier.naivebayes.BayesUtils;
-import org.apache.mahout.classifier.naivebayes.NaiveBayesModel;
-import org.apache.mahout.classifier.naivebayes.StandardNaiveBayesClassifier;
 import org.apache.mahout.common.Pair;
 import org.apache.mahout.common.iterator.sequencefile.SequenceFileIterable;
 import org.apache.mahout.math.RandomAccessSparseVector;
 import org.apache.mahout.math.Vector;
-import org.apache.mahout.math.Vector.Element;
+import org.apache.mahout.math.VectorWritable;
 import org.apache.mahout.vectorizer.DefaultAnalyzer;
 import org.apache.mahout.vectorizer.TFIDF;
 
 import com.google.common.collect.ConcurrentHashMultiset;
 import com.google.common.collect.Multiset;
 
-/**
- * http://www.chimpler.com
- */
-public class Classifier {
-	
+public class TweetTSVToTrainingSetSeq {
 	public static Map<String, Integer> readDictionnary(Configuration conf, Path dictionnaryPath) {
 		Map<String, Integer> dictionnary = new HashMap<String, Integer>();
 		for (Pair<Text, IntWritable> pair : new SequenceFileIterable<Text, IntWritable>(dictionnaryPath, true, conf)) {
@@ -65,38 +45,30 @@ public class Classifier {
 		return documentFrequency;
 	}
 
+	
 	public static void main(String[] args) throws Exception {
-		if (args.length < 5) {
-			System.out.println("Arguments: [model] [label index] [dictionnary] [document frequency] [tweet file]");
+		if (args.length < 4) {
+			System.out.println("Arguments: [dictionnary] [document frequency] [tweet file] [output file]");
 			return;
 		}
-		String modelPath = args[0];
-		String labelIndexPath = args[1];
-		String dictionaryPath = args[2];
-		String documentFrequencyPath = args[3];
-		String tweetsPath = args[4];
-		
+		String dictionaryPath = args[0];
+		String documentFrequencyPath = args[1];
+		String tweetsPath = args[2];
+		String outputFileName = args[3];
+
 		Configuration configuration = new Configuration();
+		FileSystem fs = FileSystem.get(configuration);
 
-		// model is a matrix (wordId, labelId) => probability score
-		NaiveBayesModel model = NaiveBayesModel.materialize(new Path(modelPath), configuration);
-		
-		StandardNaiveBayesClassifier classifier = new StandardNaiveBayesClassifier(model);
-
-		// labels is a map label => classId
-		Map<Integer, String> labels = BayesUtils.readLabelIndex(configuration, new Path(labelIndexPath));
 		Map<String, Integer> dictionary = readDictionnary(configuration, new Path(dictionaryPath));
 		Map<Integer, Long> documentFrequency = readDocumentFrequency(configuration, new Path(documentFrequencyPath));
-
-		
-		// analyzer used to extract word from tweet
-		Analyzer analyzer = new DefaultAnalyzer();
-		
-		int labelCount = labels.size();
 		int documentCount = documentFrequency.get(-1).intValue();
 		
-		System.out.println("Number of labels: " + labelCount);
-		System.out.println("Number of documents in training set: " + documentCount);
+		Writer writer = new SequenceFile.Writer(fs, configuration, new Path(outputFileName),
+				Text.class, VectorWritable.class);
+		Text key = new Text();
+		VectorWritable value = new VectorWritable();
+
+		Analyzer analyzer = new DefaultAnalyzer();
 		BufferedReader reader = new BufferedReader(new FileReader(tweetsPath));
 		while(true) {
 			String line = reader.readLine();
@@ -104,11 +76,12 @@ public class Classifier {
 				break;
 			}
 			
-			String[] tokens = line.split("\t", 2);
-			String tweetId = tokens[0];
-			String tweet = tokens[1];
-
-			System.out.println("Tweet: " + tweetId + "\t" + tweet);
+			String[] tokens = line.split("\t", 3);
+			String label = tokens[0];
+			String tweetId = tokens[1];
+			String tweet = tokens[2];
+			
+			key.set("/" + label + "/" + tweetId);
 
 			Multiset<String> words = ConcurrentHashMultiset.create();
 			
@@ -136,26 +109,15 @@ public class Classifier {
 				String word = entry.getElement();
 				int count = entry.getCount();
 				Integer wordId = dictionary.get(word);
+				// if the word is not in the dictionary, skip it
 				Long freq = documentFrequency.get(wordId);
 				double tfIdfValue = tfidf.calculate(count, freq.intValue(), wordCount, documentCount);
 				vector.setQuick(wordId, tfIdfValue);
 			}
-			// With the classifier, we get one score for each label 
-			// The label with the highest score is the one the tweet is more likely to
-			// be associated to
-			Vector resultVector = classifier.classifyFull(vector);
-			double bestScore = -Double.MAX_VALUE;
-			int bestCategoryId = -1;
-			for(Element element: resultVector) {
-				int categoryId = element.index();
-				double score = element.get();
-				if (score > bestScore) {
-					bestScore = score;
-					bestCategoryId = categoryId;
-				}
-				System.out.print("  " + labels.get(categoryId) + ": " + score);
-			}
-			System.out.println(" => " + labels.get(bestCategoryId));
+			value.set(vector);
+			
+			writer.append(key, value);
 		}
+		writer.close();
 	}
 }
