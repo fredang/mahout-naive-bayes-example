@@ -16,13 +16,14 @@ import org.apache.hadoop.io.SequenceFile.Writer;
 import org.apache.hadoop.io.Text;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+import org.apache.lucene.util.Version;
 import org.apache.mahout.common.Pair;
 import org.apache.mahout.common.iterator.sequencefile.SequenceFileIterable;
 import org.apache.mahout.math.RandomAccessSparseVector;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
-import org.apache.mahout.vectorizer.DefaultAnalyzer;
 import org.apache.mahout.vectorizer.TFIDF;
 
 import com.google.common.collect.ConcurrentHashMultiset;
@@ -68,7 +69,7 @@ public class TweetTSVToTrainingSetSeq {
 		Text key = new Text();
 		VectorWritable value = new VectorWritable();
 
-		Analyzer analyzer = new DefaultAnalyzer();
+		Analyzer analyzer = new StandardAnalyzer(Version.LUCENE_43);
 		BufferedReader reader = new BufferedReader(new FileReader(tweetsPath));
 		while(true) {
 			String line = reader.readLine();
@@ -86,7 +87,7 @@ public class TweetTSVToTrainingSetSeq {
 			Multiset<String> words = ConcurrentHashMultiset.create();
 			
 			// extract words from tweet
-			TokenStream ts = analyzer.reusableTokenStream("text", new StringReader(tweet));
+			TokenStream ts = analyzer.tokenStream("text", new StringReader(tweet));
 			CharTermAttribute termAtt = ts.addAttribute(CharTermAttribute.class);
 			ts.reset();
 			int wordCount = 0;
