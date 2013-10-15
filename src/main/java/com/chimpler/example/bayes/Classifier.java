@@ -158,5 +158,7 @@ public class Classifier {
 			}
 			System.out.println(" => " + labels.get(bestCategoryId));
 		}
+		analyzer.close();
+		reader.close();
 	}
 }

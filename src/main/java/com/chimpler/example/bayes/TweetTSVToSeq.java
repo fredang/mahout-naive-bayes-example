@@ -64,6 +64,7 @@ public class TweetTSVToSeq {
 			writer.append(key, value);
 			count++;
 		}
+		reader.close();
 		writer.close();
 		System.out.println("Wrote " + count + " entries.");
 	}

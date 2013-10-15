@@ -119,6 +119,8 @@ public class TweetTSVToTrainingSetSeq {
 			
 			writer.append(key, value);
 		}
+		analyzer.close();
+		reader.close();
 		writer.close();
 	}
 }
