@@ -129,7 +129,9 @@ public class Classifier {
 					}
 				}
 			}
-
+			// Fixed error : close ts:TokenStream
+			ts.end();
+			ts.close();
 			// create vector wordId => weight using tfidf
 			Vector vector = new RandomAccessSparseVector(10000);
 			TFIDF tfidf = new TFIDF();
